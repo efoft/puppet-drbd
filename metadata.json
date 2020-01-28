@@ -1,12 +1,10 @@
 {
   "name": "puppet-drbd",
-  "version": "0.5.3-rc0",
-  "author": "Vox Pupuli",
+  "version": "0.6",
+  "author": "efoft",
   "license": "Apache-2.0",
   "summary": "DRBD Module",
-  "source": "https://github.com/voxpupuli/puppet-drbd",
-  "project_page": "https://github.com/voxpupuli/puppet-drbd",
-  "issues_url": "https://github.com/voxpupuli/puppet-drbd/issues",
+  "source": "https://github.com/efoft/puppet-drbd",
   "tags": [
     "drbd"
   ],

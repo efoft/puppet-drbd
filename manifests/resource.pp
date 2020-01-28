@@ -1,70 +1,49 @@
-# Used to created a resource that replicates data
-# between 2 hosts for HA.
 #
-# == Parameters
-#  [host1] Name of first host. Required unless $cluster is set.
-#  [host2] Name of second host. Required unless $cluster is set.
-#  [ip1] Ipaddress of first host. Required unless $cluster or $res1/$res2 is set.
-#  [ip2] Ipaddress of second host. Required unless $cluster or $res1/$res2 is set.
-#  [res1] First stacked resource name.
-#  [res2] Second stacked resource name.
-#  [disk] Name of disk to be replicated. Assumes that the
-#     name of the disk will be the same on both hosts. Required.
-#  [metadisk] Name of the metadisk. Allows to use an external metadisk. Assumes
-#     that the name of the metadisk will be the same on both hosts. Defaults to internal
-#     this parameter is ignored if flexible_metadisk is defined
-#  [flexible_metadisk] Name of the flexible_metadisk
-#     defaults to undef. If defined, the metadisk parameter is superseeded
-#  [secret] The shared secret used in peer authentication.. False indicates that
-#    no secret be required. Optional. Defaults to false.
-#  [port] Port which drbd will use for replication on both hosts.
-#     Optional. Defaults to 7789.
-#  [protocol] Protocol to use for drbd. Optional. Defaults to 'C'
-#     http://www.drbd.org/users-guide/s-replication-protocols.html
-#  [verify_alg] Algorithm used for block validation on peers. Optional.
-#    Defaults to crc32c. Accepts crc32c, sha1, or md5.
-#  [disk_parameters] Parameters for disk{} section
-#  [handlers_parameters] Parameters for handlers{} section
-#  [startup_parameters] Parameters for startup{} section
-#  [manage] If the actual drbd resource shoudl be managed.
-#  [ha_primary] If the resource is being applied on the primary host.
-#  [initial_setup] If this run is associated with the initial setup. Allows a user
-#    to only perform dangerous setup on the initial run.
-#  [initialize] If the actual drbd resource should be initialized
-#  [up] If the actual drbd resource should be set 'up' (drbdadmin up)
+# @summary                   Used to created a resource that replicates data between 2 hosts for HA.
+#
+# @param host1               Name of first host. Required unless $cluster is set.
+# @param host2               Name of second host. Required unless $cluster is set.
+# @param ip1                 Ipaddress of first host. Required unless $cluster or $res1/$res2 is set.
+# @param ip2                 Ipaddress of second host. Required unless $cluster or $res1/$res2 is set.
+# @param res1                First stacked resource name.
+# @param res2                Second stacked resource name.
+# @param disk                Name of disk to be replicated. Assumes that the name of the disk will be the same on both hosts.
+# @param metadisk            Internal or the name of external metadisk. Must be the same on both hosts. Ignored if flexible_metadisk is defined.
+# @param flexible_metadisk   Name of the flexible_metadisk. If defined, the metadisk parameter is superseeded.
+# @param secret              The shared secret used in peer authentication. No auth required if undef.
+# @param port                Port which drbd will use for replication on both hosts.
+# @param protocol            Protocol to use for drbd. See http://www.drbd.org/users-guide/s-replication-protocols.html
+# @param verify_alg          Algorithm used for block validation on peers.
+# @param disk_parameters     Parameters for disk{} section.
+# @param handlers_parameters Parameters for handlers{} section.
+# @param startup_parameters  Parameters for startup{} section.
+# @param manage              If the actual drbd resource should be managed.
+#
 define drbd::resource (
-  $host1                                                      = undef,
-  $host2                                                      = undef,
-  $ip1                                                        = undef,
-  $ip2                                                        = undef,
-  $res1                                                       = undef,
-  $res2                                                       = undef,
-  $cluster                                                    = undef,
-  $secret                                                     = false,
-  $port                                                       = '7789',
-  $device                                                     = '/dev/drbd0',
-  $mountpoint                                                 = "/drbd/${name}",
-  $automount                                                  = true,
-  $owner                                                      = 'root',
-  $group                                                      = 'root',
-  $protocol                                                   = 'C',
-  $verify_alg                                                 = 'crc32c',
-  $rate                                                       = false,
-  $disk_parameters                                            = false,
-  $net_parameters                                             = false,
+  Optional[Stdlib::Host]                $host1                = undef,
+  Optional[Stdlib::Host]                $host2                = undef,
+  Optional[Stdlib::Ip::Address]         $ip1                  = undef,
+  Optional[Stdlib::Ip::Address]         $ip2                  = undef,
+  Optional[String]                      $res1                 = undef,
+  Optional[String]                      $res2                 = undef,
+  Optional[String]                      $cluster              = undef,
+  Optional[String]                      $secret               = undef,
+  Stdlib::Ip::Address                   $myip                 = $::ipaddress,
+  Integer                               $port                 = 7789,
+  Stdlib::Unixpath                      $device               = '/dev/drbd0',
+  Enum['A','B','C']                     $protocol             = 'C',
+  Enum['crc32c','sha1','md5']           $verify_alg           = 'crc32c',
+  Optional[String]                      $rate                 = undef,
+  Hash                                  $disk_parameters      = {},
+  Hash                                  $net_parameters       = {},
   Hash[String, Variant[Integer,String]] $handlers_parameters  = {},
   Hash[String, Variant[Integer,String]] $startup_parameters   = {},
-  $manage                                                     = true,
-  $ha_primary                                                 = false,
-  $initial_setup                                              = false,
-  Boolean $initialize                                         = true,
-  Boolean $up                                                 = true,
-  $fs_type                                                    = 'ext4',
-  $mkfs_opts                                                  = '',
-  $disk                                                       = undef,
-  String[1] $metadisk                                         = 'internal',
-  Optional[String[1]] $flexible_metadisk                      = undef,
+  Boolean                               $manage               = true,
+  Stdlib::Unixpath                      $disk,
+  String[1]                             $metadisk             = 'internal',
+  Optional[String[1]]                   $flexible_metadisk    = undef,
 ) {
+
   include drbd
 
   Exec {
@@ -72,56 +51,28 @@ define drbd::resource (
     logoutput => 'on_failure',
   }
 
-  File {
-    owner => 'root',
-    group => 'root',
-  }
-
-  file { $mountpoint:
-    ensure => directory,
-    mode   => '0755',
-    owner  => $owner,
-    group  => $group,
-  }
-
   concat { "/etc/drbd.d/${name}.res":
-    mode    => '0600',
-    require => [
-      Package['drbd'],
-      File['/etc/drbd.d'],
-    ],
-    notify  => Class['drbd::service'],
+    owner  => 'root',
+    group  => 'root',
+    mode   => '0600',
+    notify => Class['drbd::service'],
   }
-  # Template uses:
-  # - $name
-  # - $protocol
-  # - $device
-  # - $disk
-  # - $metadisk
-  # - $secret
-  # - $verify_alg
-  # - $host1
-  # - $host2
-  # - $ip1
-  # - $ip2
-  # - $port
+
   concat::fragment { "${name} drbd header":
     target  => "/etc/drbd.d/${name}.res",
     content => template('drbd/header.res.erb'),
     order   => '01',
   }
-  # Export our fragment for the clustered node
-  if $ha_primary and $cluster {
-    @@concat::fragment { "${name} ${cluster} primary resource":
-      target  => "/etc/drbd.d/${name}.res",
-      content => template('drbd/resource.res.erb'),
-      order   => '10',
-    }
-  } elsif $cluster {
-    @@concat::fragment { "${name} ${cluster} secondary resource":
-      target  => "/etc/drbd.d/${name}.res",
-      content => template('drbd/resource.res.erb'),
-      order   => '20',
+
+  if $cluster {
+    # Export our fragment for the clustered node
+    @@drbd::resource::peer { "${name} resource of ${::fqdn}":
+      peer     => $::fqdn,
+      resource => $name,
+      ip       => $myip,
+      port     => $port,
+      manage   => $manage,
+      tag      => $cluster,
     }
   } elsif $host1 and $ip1 and $host2 and $ip2 {
     concat::fragment { "${name} static primary resource":
@@ -156,29 +107,15 @@ define drbd::resource (
   }
 
   if $cluster {
-    # Import cluster nodes
-    Concat::Fragment <<| title == "${name} ${cluster} primary resource" |>>
-    Concat::Fragment <<| title == "${name} ${cluster} secondary resource" |>>
+    # Import cluster nodes and realize DRBD service
+    Drbd::Resource::Peer <<| tag == $cluster |>>
   }
-
-  # Due to a bug in puppet, defined() conditionals must be in a defined
-  # resource to be evaluated *after* the collector instead of before.
-  $_cluster = $cluster ? {
-    undef   => 'static',
-    default => $cluster,
-  }
-  drbd::resource::enable { $name:
-    manage        => $manage,
-    disk          => $disk,
-    fs_type       => $fs_type,
-    mkfs_opts     => $mkfs_opts,
-    device        => $device,
-    ha_primary    => $ha_primary,
-    initial_setup => $initial_setup,
-    initialize    => $initialize,
-    up            => $up,
-    cluster       => $_cluster,
-    mountpoint    => $mountpoint,
-    automount     => $automount,
+  else {
+    if $manage {
+      drbd::resource::up { $name:
+        disk => $disk,
+      }
+    }
+    realize(Service['drbd'])
   }
 }

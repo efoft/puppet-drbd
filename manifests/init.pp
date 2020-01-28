@@ -1,22 +1,20 @@
 #
 # This class can be used to configure the drbd service.
 #
-# It has been influenced by the camptocamp module as well as
-# by an example created by Rackspace's cloudbuilders
+# It has been first forked from https://github.com/voxpupuli/puppet-drbd/
+# then almost completely rewritten and refactored.
 #
-class drbd(
+class drbd (
   Boolean                                 $service_enable = true,
   Enum['running', 'stopped', 'unmanaged'] $service_ensure = running,
-  String                                  $package_name   = 'drbd8-utils',
+  Variant[String,Array[String]]           $package_name   = ['drbd84-utils','kmod-drbd84'],
 ) {
+
   include drbd::service
 
-  package { 'drbd':
+  package { $package_name:
     ensure => present,
-    name   => $package_name,
-  }
-
-  # ensure that the kernel module is loaded
+  } ->
   exec { 'modprobe drbd':
     path   => ['/bin/', '/sbin/'],
     unless => 'grep -qe \'^drbd \' /proc/modules',
@@ -26,7 +24,7 @@ class drbd(
     mode    => '0644',
     owner   => 'root',
     group   => 'root',
-    require => Package['drbd'],
+    require => Package[$package_name],
     notify  => Class['drbd::service'],
   }
 
@@ -46,11 +44,8 @@ class drbd(
   # only allow files managed by puppet in this directory.
   file { '/etc/drbd.d':
     ensure  => directory,
-    mode    => '0644',
     purge   => true,
     recurse => true,
     force   => true,
-    require => Package['drbd'],
   }
-
 }

@@ -1,15 +1,27 @@
-class drbd::service {
+#
+class drbd::service inherits drbd {
 
-  if $drbd::service_ensure == 'unmanaged' {
+  if $service_ensure == 'unmanaged' {
     $_ensure = undef
   } else {
-    $_ensure = $drbd::service_ensure
+    $_ensure = $service_ensure
   }
+
+  # random number of seconds to wait after DRBD service started and before proceeding with drbdadm primary commands
+  # to avoid race condition between the nodes
+  $seconds = seeded_rand(30, $::fqdn)
 
   @service { 'drbd':
     ensure  => $_ensure,
-    enable  => $drbd::service_enable,
-    require => Package['drbd'],
-    restart => 'service drbd reload',
+    enable  => $service_enable,
+    require => Package[$package_name],
+    restart => 'systemctl reload drbd',
+  } ~>
+
+  # sleep random number of seconds
+  exec { "sleep ${seconds} seconds before trying to become primary":
+    command     => "sleep ${seconds}",
+    refreshonly => true,
+    path        => ['/usr/bin','/bin'],
   }
 }

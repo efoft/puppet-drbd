@@ -1,90 +1,56 @@
+#
 define drbd::resource::up (
   $disk,
-  $ha_primary,
-  $initial_setup,
-  $initialize,
-  $up,
-  $fs_type,
-  $mkfs_opts,
-  $device,
-  $mountpoint,
-  $automount,
 ) {
-  # create metadata on device, except if resource seems already initalized.
-  # drbd is very tenacious about asking for aproval if there is data on the
-  # volume already.
-  if $initialize {
-    exec { "initialize DRBD metadata for ${name}":
-      command => "yes yes | drbdadm create-md ${name}",
-      onlyif  => "test -e ${disk}",
-      unless  => "drbdadm dump-md ${name} || (drbdadm cstate ${name} | egrep -q '^(Sync|Connected|WFConnection|StandAlone|Verify)')",
-      before  => [
-        Service['drbd'],
-      ],
-      require => [
-        Exec['modprobe drbd'],
-        Concat["/etc/drbd.d/${name}.res"],
-        ],
-      notify  => Service['drbd'],
-    }
-  }
 
-  if $up {
-    exec { "enable DRBD resource ${name}":
-      command => "drbdadm up ${name}",
-      onlyif  => "drbdadm dstate ${name} | egrep -q '^(Diskless/|Unconfigured|Consistent)'",
-      before  => Service['drbd'],
-      require => Exec['modprobe drbd'],
-      notify  => Service['drbd'],
-    }
-  }
+  include ::drbd
 
+  # create metadata on device, except if resource seems already initalized
+  exec { "resource ${name}: initialize metadata":
+    command => "yes yes | drbdadm create-md ${name}",
+    onlyif  => [
+      "test -f ${disk}",
+      "drbdadm dump-md ${name} 2>&1 | grep 'No valid meta data found'",
+    ],
+    unless  => "drbdadm cstate ${name} | egrep -q '^(Sync|Connected|WFConnection|StandAlone|Verify)'",
+    before  => Service['drbd'],
+  } ->
 
-  # these resources should only be applied if we are configuring the
-  # primary node in our HA setup
-  if $ha_primary {
-    # these things should only be done on the primary during initial setup
-    if $initial_setup {
-      exec { "drbd_make_primary_${name}":
-        command => "drbdadm -- --overwrite-data-of-peer primary ${name}",
-        unless  => "drbdadm role ${name} | egrep '^Primary'",
-        onlyif  => "drbdadm dstate ${name} | egrep '^Inconsistent'",
-        notify  => Exec["drbd_format_volume_${name}"],
-        before  => Exec["drbd_make_primary_again_${name}"],
-        require => Service['drbd'],
-      }
-      $before = $automount ? {
-        false   => undef,
-        default => Mount[$mountpoint],
-      }
-      exec { "drbd_format_volume_${name}":
-        command     => "mkfs.${fs_type} ${mkfs_opts} ${device}",
-        refreshonly => true,
-        require     => Exec["drbd_make_primary_${name}"],
-        before      => $before,
-      }
-    }
+  # establish initial replication (peer connected, no primary, dstate inconsistent)
+  exec { "resource ${name}: force primary":
+    command => "drbdadm -- --overwrite-data-of-peer primary ${name}",
+    unless  => "drbdadm role ${name} | grep 'Primary'",
+    onlyif  => [
+      "drbdadm dstate ${name} | egrep -q '^Inconsistent'",
+      "drbdadm cstate ${name} | grep -q 'Connected'",
+    ],
+    require => Class['drbd::service'],
+  } ->
 
-    exec { "drbd_make_primary_again_${name}":
-      command => "drbdadm primary ${name}",
-      unless  => "drbdadm role ${name} | egrep '^Primary'",
-      require => Service['drbd'],
-    }
+  # re-establish replication (peers connected, no primary)
+  exec { "resource ${name}: make primary":
+    command => "drbdadm primary ${name}",
+    onlyif  => [
+      "drbdadm dstate ${name} | egrep -q '^UpToDate'",
+      "drbdadm cstate ${name} | grep -q 'Connected'",
+    ],
+    unless  => "drbdadm role ${name} | grep 'Primary'",
+  } ->
 
-    if $automount {
-      # ensure that the device is mounted
-      mount { $mountpoint:
-        ensure  => mounted,
-        atboot  => false,
-        device  => $device,
-        fstype  => 'auto',
-        options => 'defaults,noauto',
-        require => [
-          Exec["drbd_make_primary_again_${name}"],
-          File[$mountpoint],
-          Service['drbd']
-        ],
-      }
-    }
+  # try to reattach disk (peers connected, me is diskless) after io failures and following detach
+  exec { "resource ${name}: attach":
+    command => "drbdadm attach ${name}",
+    onlyif  => [
+      "drbdadm dstate ${name} | egrep -q '^Diskless'",
+      "drbdadm cstate ${name} | grep -q 'Connected'",
+    ],
+  } ->
+
+  # normally resources are enabled by DRBD service but if somehow peers were disconnected
+  # try to connect them back and up
+  exec { "resource ${name}: enable":
+    command => "drbdadm up ${name}",
+    onlyif  => "drbdadm dstate ${name} | egrep -q '^(Diskless|Unconfigured|Inconsistent)'",
+    unless  => "drbdadm cstate ${name}",
   }
 }
