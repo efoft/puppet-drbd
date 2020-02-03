@@ -7,17 +7,20 @@
 # @param ip2                 Ipaddress of second host. Required unless $cluster or $res1/$res2 is set.
 # @param res1                First stacked resource name.
 # @param res2                Second stacked resource name.
-# @param disk                Name of disk to be replicated. Assumes that the name of the disk will be the same on both hosts.
-# @param metadisk            Internal or the name of external metadisk. Must be the same on both hosts. Ignored if flexible_metadisk is defined.
-# @param flexible_metadisk   Name of the flexible_metadisk. If defined, the metadisk parameter is superseeded.
+# @param cluster_name        Arbitary work used as tag for exported resources.
 # @param secret              The shared secret used in peer authentication. No auth required if undef.
+# @param myip                To override fact in case of multihomed hosts.
 # @param port                Port which drbd will use for replication on both hosts.
+# @param device              The path of the drbd device to be used.
 # @param protocol            Protocol to use for drbd. See http://www.drbd.org/users-guide/s-replication-protocols.html
 # @param verify_alg          Algorithm used for block validation on peers.
 # @param disk_parameters     Parameters for disk{} section.
 # @param handlers_parameters Parameters for handlers{} section.
 # @param startup_parameters  Parameters for startup{} section.
 # @param manage              If the actual drbd resource should be managed.
+# @param disk                Name of disk to be replicated. Assumes that the name of the disk will be the same on both hosts.
+# @param metadisk            Must be the same on both hosts. Ignored if flexible_metadisk is defined.
+# @param flexible_metadisk   Name of the flexible_metadisk. If defined, the metadisk parameter is superseeded.
 #
 define drbd::resource (
   Optional[Stdlib::Host]                $host1                = undef,
@@ -26,7 +29,7 @@ define drbd::resource (
   Optional[Stdlib::Ip::Address]         $ip2                  = undef,
   Optional[String]                      $res1                 = undef,
   Optional[String]                      $res2                 = undef,
-  Optional[String]                      $cluster              = undef,
+  Optional[String]                      $cluster_name         = undef,
   Optional[String]                      $secret               = undef,
   Stdlib::Ip::Address                   $myip                 = $::ipaddress,
   Integer                               $port                 = 7789,
@@ -64,7 +67,7 @@ define drbd::resource (
     order   => '01',
   }
 
-  if $cluster {
+  if $cluster_name {
     # Export our fragment for the clustered node
     @@drbd::resource::peer { "${name} resource of ${::fqdn}":
       peer     => $::fqdn,
@@ -72,7 +75,7 @@ define drbd::resource (
       ip       => $myip,
       port     => $port,
       manage   => $manage,
-      tag      => $cluster,
+      tag      => $cluster_name,
     }
   } elsif $host1 and $ip1 and $host2 and $ip2 {
     concat::fragment { "${name} static primary resource":
@@ -106,9 +109,9 @@ define drbd::resource (
     order   => '99',
   }
 
-  if $cluster {
+  if $cluster_name {
     # Import cluster nodes and realize DRBD service
-    Drbd::Resource::Peer <<| tag == $cluster |>>
+    Drbd::Resource::Peer <<| tag == $cluster_name |>>
   }
   else {
     if $manage {

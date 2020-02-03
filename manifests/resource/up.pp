@@ -14,10 +14,10 @@ define drbd::resource::up (
     ],
     unless  => "drbdadm cstate ${name} | egrep -q '^(Sync|Connected|WFConnection|StandAlone|Verify)'",
     before  => Service['drbd'],
-  } ->
+  }
 
   # establish initial replication (peer connected, no primary, dstate inconsistent)
-  exec { "resource ${name}: force primary":
+  -> exec { "resource ${name}: force primary":
     command => "drbdadm -- --overwrite-data-of-peer primary ${name}",
     unless  => "drbdadm role ${name} | grep 'Primary'",
     onlyif  => [
@@ -25,30 +25,30 @@ define drbd::resource::up (
       "drbdadm cstate ${name} | grep -q 'Connected'",
     ],
     require => Class['drbd::service'],
-  } ->
+  }
 
   # re-establish replication (peers connected, no primary)
-  exec { "resource ${name}: make primary":
+  -> exec { "resource ${name}: make primary":
     command => "drbdadm primary ${name}",
     onlyif  => [
       "drbdadm dstate ${name} | egrep -q '^UpToDate'",
       "drbdadm cstate ${name} | grep -q 'Connected'",
     ],
     unless  => "drbdadm role ${name} | grep 'Primary'",
-  } ->
+  }
 
   # try to reattach disk (peers connected, me is diskless) after io failures and following detach
-  exec { "resource ${name}: attach":
+  -> exec { "resource ${name}: attach":
     command => "drbdadm attach ${name}",
     onlyif  => [
       "drbdadm dstate ${name} | egrep -q '^Diskless'",
       "drbdadm cstate ${name} | grep -q 'Connected'",
     ],
-  } ->
+  }
 
   # normally resources are enabled by DRBD service but if somehow peers were disconnected
   # try to connect them back and up
-  exec { "resource ${name}: enable":
+  -> exec { "resource ${name}: enable":
     command => "drbdadm up ${name}",
     onlyif  => "drbdadm dstate ${name} | egrep -q '^(Diskless|Unconfigured|Inconsistent)'",
     unless  => "drbdadm cstate ${name}",

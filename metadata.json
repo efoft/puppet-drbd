@@ -1,6 +1,6 @@
 {
   "name": "puppet-drbd",
-  "version": "0.6",
+  "version": "0.6.1",
   "author": "efoft",
   "license": "Apache-2.0",
   "summary": "DRBD Module",

@@ -14,8 +14,8 @@ class drbd (
 
   package { $package_name:
     ensure => present,
-  } ->
-  exec { 'modprobe drbd':
+  }
+  -> exec { 'modprobe drbd':
     path   => ['/bin/', '/sbin/'],
     unless => 'grep -qe \'^drbd \' /proc/modules',
   }

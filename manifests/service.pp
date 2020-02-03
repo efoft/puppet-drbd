@@ -16,10 +16,10 @@ class drbd::service inherits drbd {
     enable  => $service_enable,
     require => Package[$package_name],
     restart => 'systemctl reload drbd',
-  } ~>
+  }
 
   # sleep random number of seconds
-  exec { "sleep ${seconds} seconds before trying to become primary":
+  ~> exec { "sleep ${seconds} seconds before trying to become primary":
     command     => "sleep ${seconds}",
     refreshonly => true,
     path        => ['/usr/bin','/bin'],
