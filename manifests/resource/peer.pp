@@ -2,6 +2,7 @@
 # @summary  Used to export and collect the peers info via PuppetDB
 #
 define drbd::resource::peer (
+  String  $disk,
   String  $peer,
   String  $resource,
   String  $ip,

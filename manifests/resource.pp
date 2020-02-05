@@ -1,6 +1,7 @@
 #
 # @summary                   Used to created a resource that replicates data between 2 hosts for HA.
 #
+# @param disk                Name of disk to be replicated. Assumes that the name of the disk will be the same on both hosts.
 # @param host1               Name of first host. Required unless $cluster is set.
 # @param host2               Name of second host. Required unless $cluster is set.
 # @param ip1                 Ipaddress of first host. Required unless $cluster or $res1/$res2 is set.
@@ -18,11 +19,11 @@
 # @param handlers_parameters Parameters for handlers{} section.
 # @param startup_parameters  Parameters for startup{} section.
 # @param manage              If the actual drbd resource should be managed.
-# @param disk                Name of disk to be replicated. Assumes that the name of the disk will be the same on both hosts.
 # @param metadisk            Must be the same on both hosts. Ignored if flexible_metadisk is defined.
 # @param flexible_metadisk   Name of the flexible_metadisk. If defined, the metadisk parameter is superseeded.
 #
 define drbd::resource (
+  Stdlib::Unixpath                      $disk,
   Optional[Stdlib::Host]                $host1                = undef,
   Optional[Stdlib::Host]                $host2                = undef,
   Optional[Stdlib::Ip::Address]         $ip1                  = undef,
@@ -42,7 +43,6 @@ define drbd::resource (
   Hash[String, Variant[Integer,String]] $handlers_parameters  = {},
   Hash[String, Variant[Integer,String]] $startup_parameters   = {},
   Boolean                               $manage               = true,
-  Stdlib::Unixpath                      $disk,
   String[1]                             $metadisk             = 'internal',
   Optional[String[1]]                   $flexible_metadisk    = undef,
 ) {
@@ -70,6 +70,7 @@ define drbd::resource (
   if $cluster_name {
     # Export our fragment for the clustered node
     @@drbd::resource::peer { "${name} resource of ${::fqdn}":
+      disk     => $disk,
       peer     => $::fqdn,
       resource => $name,
       ip       => $myip,
