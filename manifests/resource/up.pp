@@ -9,7 +9,7 @@ define drbd::resource::up (
   exec { "resource ${name}: initialize metadata":
     command => "yes yes | drbdadm create-md ${name}",
     onlyif  => [
-      "test -f ${disk}",
+      "test -b ${disk}",
       "drbdadm dump-md ${name} 2>&1 | grep 'No valid meta data found'",
     ],
     unless  => "drbdadm cstate ${name} | egrep -q '^(Sync|Connected|WFConnection|StandAlone|Verify)'",
