@@ -16,6 +16,7 @@
 # @param protocol            Protocol to use for drbd. See http://www.drbd.org/users-guide/s-replication-protocols.html
 # @param verify_alg          Algorithm used for block validation on peers.
 # @param disk_parameters     Parameters for disk{} section.
+# @param net_parameters      Parameters for net{} section.
 # @param handlers_parameters Parameters for handlers{} section.
 # @param startup_parameters  Parameters for startup{} section.
 # @param manage              If the actual drbd resource should be managed.

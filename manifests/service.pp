@@ -19,9 +19,12 @@ class drbd::service inherits drbd {
   }
 
   # sleep random number of seconds
-  ~> exec { "sleep ${seconds} seconds before trying to become primary":
-    command     => "sleep ${seconds}",
-    refreshonly => true,
-    path        => ['/usr/bin','/bin'],
+  if $service_ensure == 'running' {
+    exec { "sleep ${seconds} seconds before trying to become primary":
+      command     => "sleep ${seconds}",
+      refreshonly => true,
+      path        => ['/usr/bin','/bin'],
+      subscribe   => Service['drbd'],
+    }
   }
 }

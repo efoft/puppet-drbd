@@ -16,6 +16,15 @@ define drbd::resource::up (
     before  => Service['drbd'],
   }
 
+  # normally resources are enabled by DRBD service but in cluster it's disabled
+  # so we enable the resource manually
+  -> exec { "resource ${name}: enable":
+    command => "drbdadm up ${name} && sleep 5", # let the connection to establish before next commands
+    onlyif  => "drbdadm dstate ${name} | egrep -q '^(Diskless|Unconfigured|Inconsistent)'",
+    unless  => "drbdadm cstate ${name}",
+    require => Class['drbd::service'],
+  }
+
   # establish initial replication (peer connected, no primary, dstate inconsistent)
   -> exec { "resource ${name}: force primary":
     command => "drbdadm -- --overwrite-data-of-peer primary ${name}",
@@ -24,7 +33,6 @@ define drbd::resource::up (
       "drbdadm dstate ${name} | egrep -q '^Inconsistent'",
       "drbdadm cstate ${name} | grep -q 'Connected'",
     ],
-    require => Class['drbd::service'],
   }
 
   # re-establish replication (peers connected, no primary)
@@ -46,11 +54,4 @@ define drbd::resource::up (
     ],
   }
 
-  # normally resources are enabled by DRBD service but if somehow peers were disconnected
-  # try to connect them back and up
-  -> exec { "resource ${name}: enable":
-    command => "drbdadm up ${name}",
-    onlyif  => "drbdadm dstate ${name} | egrep -q '^(Diskless|Unconfigured|Inconsistent)'",
-    unless  => "drbdadm cstate ${name}",
-  }
 }
