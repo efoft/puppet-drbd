@@ -10,7 +10,7 @@
 # @param res2                Second stacked resource name.
 # @param cluster_name        Arbitary work used as tag for exported resources.
 # @param secret              The shared secret used in peer authentication. No auth required if undef.
-# @param myip                To override fact in case of multihomed hosts.
+# @param myip                To override fact in case of multihomed hosts. Needed only exported resources are used.
 # @param port                Port which drbd will use for replication on both hosts.
 # @param device              The path of the drbd device to be used.
 # @param protocol            Protocol to use for drbd. See http://www.drbd.org/users-guide/s-replication-protocols.html
