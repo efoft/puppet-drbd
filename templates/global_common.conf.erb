@@ -1,6 +1,18 @@
 global {
-  usage-count no;
+<% if @global_options -%>
+<% @global_options.each do |k,v| -%>
+  <%= k %> <%= v %>;
+<% end -%>
+<% end -%>
 }
 common {
   protocol C;
+<% if @common_options -%>
+
+  options {
+<% @common_options.each do |k,v| -%>
+    <%= k %> <%= v %>;
+<% end -%>
+  }
+<% end -%>
 }

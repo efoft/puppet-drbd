@@ -8,6 +8,8 @@ class drbd (
   Boolean                                 $service_enable = true,
   Enum['running', 'stopped', 'unmanaged'] $service_ensure = running,
   Variant[String,Array[String]]           $package_name   = ['drbd84-utils','kmod-drbd84'],
+  Hash                                    $global_options = {},
+  Hash                                    $common_options = {},
 ) {
 
   include drbd::service
