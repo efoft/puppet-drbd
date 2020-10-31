@@ -42,7 +42,9 @@ define drbd::resource::up (
       "drbdadm dstate ${name} | egrep -q '^UpToDate'",
       "drbdadm cstate ${name} | grep -q 'Connected'",
     ],
-    unless  => "drbdadm role ${name} | grep 'Primary'",
+    unless  => [
+      "drbdadm status ${name} | grep 'role:Primary'",
+    ]
   }
 
   # try to reattach disk (peers connected, me is diskless) after io failures and following detach
