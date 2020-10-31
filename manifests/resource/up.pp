@@ -20,9 +20,11 @@ define drbd::resource::up (
   # so we enable the resource manually
   -> exec { "resource ${name}: enable":
     command => "drbdadm up ${name} && sleep 5", # let the connection to establish before next commands
-    onlyif  => "drbdadm dstate ${name} | egrep -q '^(Diskless|Unconfigured|Inconsistent)'",
-    unless  => "drbdadm cstate ${name}",
-    require => Class['drbd::service'],
+    onlyif  => "drbdadm dstate ${name} | egrep -q '^(Diskless|Unconfigured|Inconsistent|Consistent)'",
+    unless  => [
+      "drbdadm cstate ${name}",
+    ],
+    before  => Service['drbd'],
   }
 
   # establish initial replication (peer connected, no primary, dstate inconsistent)
@@ -35,7 +37,17 @@ define drbd::resource::up (
     ],
   }
 
-  # re-establish replication (peers connected, no primary)
+  # demote to secondary again if auto-promote is yes
+  -> exec { "resource ${name}: make secondary":
+    command => "drbdadm secondary ${name}",
+    onlyif  => [
+      "drbdadm role ${name} | grep 'Primary'",
+      'egrep "auto-promote\s+yes" /etc/drbd.d/global_common.conf',
+    ],
+    refreshonly => true,
+  }
+
+  # re-establish replication (peers connected, no primary) only if not auto-promote
   -> exec { "resource ${name}: make primary":
     command => "drbdadm primary ${name}",
     onlyif  => [
@@ -44,10 +56,11 @@ define drbd::resource::up (
     ],
     unless  => [
       "drbdadm status ${name} | grep 'role:Primary'",
+      'egrep "auto-promote\s+yes" /etc/drbd.d/global_common.conf',
     ]
   }
 
-  # try to reattach disk (peers connected, me is diskless) after io failures and following detach
+  # try to reattach disk (peers connected, me is diskless) after io failures and followed detach
   -> exec { "resource ${name}: attach":
     command => "drbdadm attach ${name}",
     onlyif  => [
