@@ -5,10 +5,14 @@ define drbd::resource::up (
 
   include ::drbd
 
+  # random number of seconds to wait after DRBD service started and before proceeding with drbdadm force primary 
+  # to avoid race condition between the nodes
+  $seconds = seeded_rand(30, $::fqdn)
+
   $force_primary_cmd = $drbd::version ?
   {
-    '8.4' => "drbdadm -- --overwrite-data-of-peer primary ${name} && sleep 5",
-    '9.0' => "drbdadm --force primary ${name} && sleep 5"
+    '8.4' => "sleep ${seconds} && drbdadm -- --overwrite-data-of-peer primary ${name} && sleep 5",
+    '9.0' => "sleep ${seconds} && drbdadm --force primary ${name} && sleep 5"
   } 
 
   # create metadata on device, except if resource seems already initalized
@@ -46,30 +50,29 @@ define drbd::resource::up (
     require => Service['drbd'],
   }
 
-  # make the resource secondary again after initial sync in case auto-promote is enabled
-  ~> exec { "resource ${name}: make secondary for auto-promote to work":
+  # make the resource secondary again after initial sync unless two primaries are allowed
+  # we make it secondary because usually drbd role is managed by external means like cluster
+  ~> exec { "resource ${name}: make secondary after initial sync":
     command => "drbdadm secondary ${name}",
-    onlyif  => [
-      "drbdadm role ${name} | grep 'Primary'",
-      'egrep "auto-promote\s+yes" /etc/drbd.d/global_common.conf',
-    ],
+    onlyif  => "drbdadm role ${name} | grep 'Primary'",
+    unless  => "drbdadm dump ${name} | egrep 'allow-two-primaries\s+yes'",
     refreshonly => true,
   }
 
-  # re-establish replication (peers connected, no primary) only if not auto-promote
+  # establish replication if two primaries are allowed (incompatible with cluster managed drbd ?)
   -> exec { "resource ${name}: make primary":
     command => "drbdadm primary ${name}",
     onlyif  => [
       "drbdadm dstate ${name} | egrep -q '^UpToDate'",
       "drbdadm cstate ${name} | grep -q 'Connected'",
+      "drbdadm dump ${name} | egrep 'allow-two-primaries\s+yes'",
     ],
     unless  => [
-      "drbdadm status ${name} | grep 'role:Primary'",
-      'egrep "auto-promote\s+yes" /etc/drbd.d/global_common.conf',
+      "drbdadm role ${name} | grep 'Primary'",
     ]
   }
 
-  # try to reattach disk (peers connected, me is diskless) after io failures and followed detach
+  # try to reattach disk (peers connected, me is diskless) after i/o failures and followed detach
   -> exec { "resource ${name}: attach":
     command => "drbdadm attach ${name}",
     onlyif  => [

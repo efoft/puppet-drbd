@@ -43,6 +43,7 @@ define drbd::resource (
   Hash                                  $net_parameters       = {},
   Hash[String, Variant[Integer,String]] $handlers_parameters  = {},
   Hash[String, Variant[Integer,String]] $startup_parameters   = {},
+  Boolean                               $allow_two_primaries  = false,
   Boolean                               $manage               = true,
   String[1]                             $metadisk             = 'internal',
   Optional[String[1]]                   $flexible_metadisk    = undef,

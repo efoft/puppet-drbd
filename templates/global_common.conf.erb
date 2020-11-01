@@ -1,5 +1,5 @@
 global {
-<% if @global_options -%>
+<% if ! @global_options.empty? -%>
 <% @global_options.each do |k,v| -%>
   <%= k %> <%= v %>;
 <% end -%>
@@ -7,7 +7,7 @@ global {
 }
 common {
   protocol C;
-<% if @common_options -%>
+<% if ! @common_options.empty? -%>
 
   options {
 <% @common_options.each do |k,v| -%>
