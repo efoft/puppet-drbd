@@ -5,6 +5,12 @@ define drbd::resource::up (
 
   include ::drbd
 
+  $force_primary_cmd = $::drbd_kernel_version_code ?
+  {
+    /^0x08/ => "drbdadm -- --overwrite-data-of-peer primary ${name}", # drbd 8.x
+    /^0x09/ => "drbdadm --force primary ${name}"                      # drbd 9.x
+  } 
+
   # create metadata on device, except if resource seems already initalized
   exec { "resource ${name}: initialize metadata":
     command => "yes yes | drbdadm create-md ${name}",
@@ -16,8 +22,7 @@ define drbd::resource::up (
     before  => Service['drbd'],
   }
 
-  # normally resources are enabled by DRBD service but in cluster it's disabled
-  # so we enable the resource manually
+  # enable the resource
   -> exec { "resource ${name}: enable":
     command => "drbdadm up ${name} && sleep 5", # let the connection to establish before next commands
     onlyif  => "drbdadm dstate ${name} | egrep -q '^(Diskless|Unconfigured|Inconsistent|Consistent)'",
@@ -29,7 +34,7 @@ define drbd::resource::up (
 
   # establish initial replication (peer connected, no primary, dstate inconsistent)
   -> exec { "resource ${name}: force primary":
-    command => "drbdadm -- --overwrite-data-of-peer primary ${name}",
+    command => $force_primary_cmd,
     unless  => "drbdadm role ${name} | grep 'Primary'",
     onlyif  => [
       "drbdadm dstate ${name} | egrep -q '^Inconsistent'",
