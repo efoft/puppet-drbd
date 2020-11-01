@@ -5,16 +5,27 @@
 # then almost completely rewritten and refactored.
 #
 class drbd (
+  Enum['8.4','9.0']                       $version        = '9.0',
+  Optional[Variant[String,Array[String]]] $package_name   = undef,
   Boolean                                 $service_enable = true,
   Enum['running', 'stopped', 'unmanaged'] $service_ensure = running,
-  Variant[String,Array[String]]           $package_name   = ['drbd84-utils','kmod-drbd84'],
   Hash                                    $global_options = {},
   Hash                                    $common_options = {},
 ) {
 
   include drbd::service
 
-  package { $package_name:
+  ## Packages names have no dot
+  $version_internal  = regsubst($version, '\.', '')
+
+  ## If no specific packages are given then use version to form their names
+  $package_name_real = $package_name ?
+  {
+    undef   => ["drbd${version_internal}-utils","kmod-drbd${version_internal}"],
+    default => $package_name
+  }
+
+  package { $package_name_real:
     ensure => present,
   }
   -> exec { 'modprobe drbd':
@@ -26,7 +37,7 @@ class drbd (
     mode    => '0644',
     owner   => 'root',
     group   => 'root',
-    require => Package[$package_name],
+    require => Package[$package_name_real],
     notify  => Class['drbd::service'],
   }
 

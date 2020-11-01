@@ -5,10 +5,10 @@ define drbd::resource::up (
 
   include ::drbd
 
-  $force_primary_cmd = $::drbd_kernel_version_code ?
+  $force_primary_cmd = $drbd::version ?
   {
-    /^0x08/ => "drbdadm -- --overwrite-data-of-peer primary ${name}", # drbd 8.x
-    /^0x09/ => "drbdadm --force primary ${name}"                      # drbd 9.x
+    '8.4' => "drbdadm -- --overwrite-data-of-peer primary ${name} && sleep 5",
+    '9.0' => "drbdadm --force primary ${name} && sleep 5"
   } 
 
   # create metadata on device, except if resource seems already initalized
@@ -35,15 +35,19 @@ define drbd::resource::up (
   # establish initial replication (peer connected, no primary, dstate inconsistent)
   -> exec { "resource ${name}: force primary":
     command => $force_primary_cmd,
-    unless  => "drbdadm role ${name} | grep 'Primary'",
     onlyif  => [
       "drbdadm dstate ${name} | egrep -q '^Inconsistent'",
       "drbdadm cstate ${name} | grep -q 'Connected'",
     ],
+    unless  => [
+      "drbdadm role ${name} | grep 'Primary'",
+      "drbdadm status ${name} | grep 'peer-disk:UpToDate'",
+    ],
+    require => Service['drbd'],
   }
 
-  # demote to secondary again if auto-promote is yes
-  -> exec { "resource ${name}: make secondary":
+  # make the resource secondary again after initial sync in case auto-promote is enabled
+  ~> exec { "resource ${name}: make secondary for auto-promote to work":
     command => "drbdadm secondary ${name}",
     onlyif  => [
       "drbdadm role ${name} | grep 'Primary'",
@@ -73,5 +77,4 @@ define drbd::resource::up (
       "drbdadm cstate ${name} | grep -q 'Connected'",
     ],
   }
-
 }
